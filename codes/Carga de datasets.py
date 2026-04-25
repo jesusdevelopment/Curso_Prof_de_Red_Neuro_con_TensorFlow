@@ -23,7 +23,6 @@ extract_dir = os.path.join(data_dir, "dataset_extraido")
 # 2. CREAR LA CARPETA (Paso crítico)
 # Usamos exist_ok=True para que no de error si ya existe
 os.makedirs(data_dir, exist_ok=True)
-# %%
 # 3. Verificamos que la carpeta realmente se creó en el sistema
 if os.path.isdir(data_dir):
     print(f"Directorio confirmado en: {data_dir}")
@@ -41,14 +40,14 @@ if os.path.isdir(data_dir):
 else:
     print(f"ERROR: No se pudo crear el directorio {data_dir}. Revisa permisos.")
 # %%
-# 4. Ruta al archivo JSON
-url='/home/jesusr/Proyectos_Deep_Learning/Curso_Prof_de_Red_Neuro_con_TensorFlow/data/dataset_extraido/sign_mnist_json/data.json' 
+# 6. Ruta al archivo JSON
+url_jason='/home/jesusr/Proyectos_Deep_Learning/Curso_Prof_de_Red_Neuro_con_TensorFlow/data/dataset_extraido/sign_mnist_json/data.json' 
 # %%
-# 5. Cargar el archivo JSON
+# 7. Cargar el archivo JSON
 data_json = []
 
 # 6. Abrimos el archivo de forma estándar
-with open(url, 'r', encoding='utf-8') as f:
+with open(url_jason, 'r', encoding='utf-8') as f:
     # Iteramos directamente sobre el archivo, línea por línea
     for line in f:
         # Usamos json.loads() (con 's' al final, para Strings) en cada línea
@@ -59,37 +58,41 @@ print(f"✅ ¡Éxito! Se cargaron {len(data_json)} registros/imágenes encontrad
 # 7. Imprimir el primer registro para ver su estructura
 print("\nMuestra del primer registro:")
 print(data_json[0])
-
-# %%
-images = []
+# 8. Procesar cada registro para obtener la imagen y su etiqueta
+images_jason = []
 
 for data in data_json:
   response = requests.get(data['content'])
   img = np.asarray(Image.open(BytesIO(response.content)))
-  images.append([img, data["label"]])
+  images_jason.append([img, data["label"]])
+
+plt.imshow(images_jason[0][0].reshape(28,28))
+print(images_jason[0][1])
 # %%
-plt.imshow(images[0][0].reshape(28,28))
-print(images[0][1])
+# 9. Ruta al archivo JSON con la imagen codificada en base64
+url_base64='/home/jesusr/Proyectos_Deep_Learning/Curso_Prof_de_Red_Neuro_con_TensorFlow/data/dataset_extraido/sign_mnist_base64/data.json'
 # %%
-url='/home/jesusr/Proyectos_Deep_Learning/Curso_Prof_de_Red_Neuro_con_TensorFlow/data/dataset_extraido/sign_mnist_base64/data.json'
-# %%
-with open(url) as f:
+with open(url_base64) as f:
   data = json.load(f)
-# %%
+# Imprimir Registro para verificar que se cargó correctamente
 data
 # %%
+# 10. Decodificar la imagen en base64 y guardarla como archivo PNG
 base64_img_bytes = data['b'].encode('utf-8')
 path_img = "/home/jesusr/Proyectos_Deep_Learning/Curso_Prof_de_Red_Neuro_con_TensorFlow/data/decoded_images.png"
 with open(path_img, "wb") as file_to_save:
   decoded_image_data = base64.decodebytes(base64_img_bytes)
   file_to_save.write(decoded_image_data)
 # %%
+# 11. Cargar la imagen decodificada usando PIL y mostrarla
 img=Image.open(path_img)
 img
 # %%
+# 12. Cargar una imagen directamente desde la ruta del dataset usando PIL
 img=Image.open('/home/jesusr/Proyectos_Deep_Learning/Curso_Prof_de_Red_Neuro_con_TensorFlow/data/dataset_extraido/pixeles.png')
 img
 # %%
+# 13. Cargar los archivos CSV de entrenamiento y prueba usando pandas
 train=pd.read_csv('/home/jesusr/Proyectos_Deep_Learning/Curso_Prof_de_Red_Neuro_con_TensorFlow/data/dataset_extraido/sign_mnist_train/sign_mnist_train.csv')
 test=pd.read_csv('/home/jesusr/Proyectos_Deep_Learning/Curso_Prof_de_Red_Neuro_con_TensorFlow/data/dataset_extraido/sign_mnist_test/sign_mnist_test.csv')
 # %%
@@ -98,6 +101,10 @@ train.head()
 train.shape
 # %%
 train_labels=train['label'].values
+# %%
+train_labels
+# %%
+train_labels.shape
 # %%
 train.drop('label', axis=1, inplace=True)
 # %%
@@ -114,4 +121,8 @@ plt.imshow(train_images[0].reshape(28,28))
 re=train_images.reshape(27455,28,28)
 # %%
 re
+# %%
+# 14. Carga del Dataset CSV para Limpiar (con el dataset de entrenamiento limpio)
+url_to_clean=pd.read_csv('/home/jesusr/Proyectos_Deep_Learning/Curso_Prof_de_Red_Neuro_con_TensorFlow/data/dataset_extraido/sign_mnist_train/sign_mnist_train_clean.csv') 
+url_to_clean.head()
 # %%
