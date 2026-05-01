@@ -12,6 +12,7 @@ import zipfile
 from PIL import Image
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from io import BytesIO
+import hashlib
 
 
 # %% [markdown]
@@ -21,36 +22,36 @@ from io import BytesIO
 # %% [markdown]
 ## Carga del Dataset
 
-base_path = "/home/jesusr/Proyectos_Deep_Learning/Curso_Prof_de_Red_Neuro_con_TensorFlow"
+base_path = "/home/jesusromero/Proyectos_Deep_Learning/Curso_Prof_de_Red_Neuro_con_TensorFlow"
 data_dir = os.path.join(base_path, "data", "brain_tumors")
 local = os.path.join(data_dir, "databasesLoadData.zip")
 extract_dir = os.path.join(data_dir, "dataset_extraido")
 
 # CRÍTICO: Primero creamos la carpeta, de lo contrario wget no tendrá dónde guardar
-os.makedirs(data_dir, exist_ok=True)
+#os.makedirs(data_dir, exist_ok=True)
 
-if os.path.isdir(data_dir):
-    print(f"Directorio confirmado en: {data_dir}")
+#if os.path.isdir(data_dir):
+#    print(f"Directorio confirmado en: {data_dir}")
 
     # Corregido: La URL debe ir entre comillas
-    url = "https://www.kaggle.com/api/v1/datasets/download/masoudnickparvar/brain-tumor-mri-dataset"
+#    url = "https://www.kaggle.com/api/v1/datasets/download/masoudnickparvar/brain-tumor-mri-dataset"
     
     # Descarga
-    print("Iniciando descarga...")
-    !wget --no-check-certificate "{url}" -O "{local}"
+#    print("Iniciando descarga...")
+#    !wget --no-check-certificate "{url}" -O "{local}"
         
     ## 5. Extracción 
-    if os.path.exists(local):
-        print(f"¡Éxito! Archivo descargado en: {local}")
+#    if os.path.exists(local):
+#        print(f"¡Éxito! Archivo descargado en: {local}")
         
         # Lógica de extracción que faltaba
-        with zipfile.ZipFile(local, 'r') as zip_ref:
-            zip_ref.extractall(extract_dir)
-        print(f"Dataset extraído en: {extract_dir}")
-    else:
-        print("ERROR: wget no pudo guardar el archivo. Verifica tu conexión o el enlace.")
-else:
-    print(f"ERROR: No se pudo crear el directorio {data_dir}.")
+#        with zipfile.ZipFile(local, 'r') as zip_ref:
+#            zip_ref.extractall(extract_dir)
+#        print(f"Dataset extraído en: {extract_dir}")
+#    else:
+#        print("ERROR: wget no pudo guardar el archivo. Verifica tu conexión o el enlace.")
+#else:
+#    print(f"ERROR: No se pudo crear el directorio {data_dir}.")
         
 # %% [markdown]
 ## EDA del dataset
@@ -89,12 +90,168 @@ plt.xticks(rotation=45)
 plt.grid(axis='y', linestyle='--', alpha=0.7)
 plt.show()
 
+# Detección de archivos Corruptos
+
+from PIL import Image
+
+def check_images(directory):
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith(('.jpg', '.jpeg', '.png')):
+                path = os.path.join(root, file)
+                try:
+                    img = Image.open(path)
+                    img.verify() # Verifica que el archivo no esté corrupto
+                except (IOError, SyntaxError):
+                    print(f'Archivo corrupto eliminado: {path}')
+                    os.remove(path)
+
+check_images(extract_dir)
+
+# Detección de Archivos Duplicados (Hashing)
+
+import imagehash
+from PIL import Image
+
+def eliminar_duplicados_visuales(directorio):
+    hashes_vistos = {}
+    duplicados_eliminados = 0
+    
+    for root, dirs, files in os.walk(directorio):
+        for file in files:
+            if file.lower().endswith(('.png', '.jpg', '.jpeg')):
+                path = os.path.join(root, file)
+                try:
+                    with Image.open(path) as img:
+                        # Genera un hash basado en la estructura visual, no en los bits
+                        # dhash es rápido y muy efectivo para detectar copias
+                        v_hash = imagehash.dhash(img)
+                    
+                    if v_hash in hashes_vistos:
+                        print(f"Eliminando duplicado visual: {path}")
+                        os.remove(path)
+                        duplicados_eliminados += 1
+                    else:
+                        hashes_vistos[v_hash] = path
+                except Exception as e:
+                    print(f"No se pudo procesar {file}: {e}")
+                
+    print(f"¡Limpieza visual terminada! Se eliminaron {duplicados_eliminados} archivos.")
+
+# Ejecutar en ambos
+eliminar_duplicados_visuales(train_dir)
+eliminar_duplicados_visuales(test_dir)
+
+# Análisis Dimensional (Tamaños y Proporciones)
+
+
+# Definimos los directorios a analizar
+sets_to_analyze = ['Training', 'Testing']
+colors = {'Training': 'blue', 'Testing': 'orange'}
+
+plt.figure(figsize=(10, 6))
+
+for dataset_type in sets_to_analyze:
+    widths, heights = [], []
+    current_path = os.path.join(extract_dir, dataset_type)
+    
+    # Recorremos todas las subcarpetas de cada set
+    for root, dirs, files in os.walk(current_path):
+        for file in files:
+            if file.endswith('.jpg'):
+                try:
+                    with Image.open(os.path.join(root, file)) as im:
+                        w, h = im.size
+                        widths.append(w)
+                        heights.append(h)
+                except Exception as e:
+                    print(f"Error al abrir {file}: {e}")
+    
+    # Graficamos cada set con un color y etiqueta diferente
+    plt.scatter(widths, heights, alpha=0.3, label=dataset_type, color=colors[dataset_type])
+
+plt.xlabel('Ancho (píxeles)')
+plt.ylabel('Alto (píxeles)')
+plt.title('Comparación de Dimensiones: Entrenamiento vs. Test')
+plt.legend()
+plt.grid(True, linestyle='--', alpha=0.6)
+plt.show()
+
+# Resumen numérico
+# Corrección para contar todos los archivos dentro de las subcarpetas
+total_train = sum([len(files) for r, d, files in os.walk(train_dir)])
+total_test = sum([len(files) for r, d, files in os.walk(test_dir)])
+
+print("--- RESUMEN DEL DATASET ---")
+print(f"Límite máximo de dimensiones: {max(widths)} (ancho) x {max(heights)} (alto)")
+print(f"Límite mínimo de dimensiones: {min(widths)} (ancho) x {min(heights)} (alto)")
+print(f"Total de imágenes para entrenamiento: {total_train}")
+print(f"Total de imágenes para prueba (Test): {total_test}")
+print(f"Proporción de entrenamiento: {total_train / (total_train + total_test):.2f}")
+print(f"Proporción de prueba: {total_test / (total_train + total_test):.2f}")
+
+# Análisis de Intensidad de Píxeles
+
+import os
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+import random
+
+def analizar_intensidades(extract_dir, sets=['Training', 'Testing'], sample_size=300):
+    plt.figure(figsize=(12, 6))
+    colores = {'Training': 'blue', 'Testing': 'orange'}
+    
+    print("Iniciando análisis de intensidades de píxel...")
+
+    for dataset_type in sets:
+        dataset_path = os.path.join(extract_dir, dataset_type)
+        all_files = []
+        
+        # 1. Recolectar todas las rutas de imágenes
+        for root, dirs, files in os.walk(dataset_path):
+            for file in files:
+                if file.endswith('.jpg'):
+                    all_files.append(os.path.join(root, file))
+        
+        # 2. Tomar una muestra aleatoria para no colapsar la RAM
+        # 300 imágenes es estadísticamente suficiente para ver la distribución
+        sampled_files = random.sample(all_files, min(sample_size, len(all_files)))
+        
+        # 3. Crear un acumulador de ceros para los 256 posibles valores de gris
+        hist_acumulado = np.zeros((256, 1))
+        
+        # 4. Sumar el histograma de cada imagen al acumulador
+        for img_path in sampled_files:
+            img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+            if img is not None:
+                # calcHist es extremadamente rápido
+                hist = cv2.calcHist([img], [0], None, [256], [0, 256])
+                hist_acumulado += hist
+                
+        # 5. Normalizar: Dividir entre el total de píxeles para tener porcentajes (0 a 1)
+        # Esto permite comparar justamente aunque un set tenga más imágenes que otro
+        hist_acumulado /= hist_acumulado.sum()
+        
+        # 6. Graficar como una línea continua
+        plt.plot(hist_acumulado, color=colores[dataset_type], label=f'{dataset_type} (n={len(sampled_files)})', alpha=0.8)
+
+    plt.title('Distribución de Intensidades de Píxel: Training vs. Testing')
+    plt.xlabel('Intensidad (0 = Negro absoluto, 255 = Blanco absoluto)')
+    plt.ylabel('Frecuencia Relativa')
+    plt.xlim([0, 256])
+    plt.legend()
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.show()
+
+# Ejecución:
+analizar_intensidades(extract_dir)
 
 
 # %% [markdown]
 ## Train y Test
-train="/home/jesusr/Proyectos_Deep_Learning/Curso_Prof_de_Red_Neuro_con_TensorFlow/data/brain_tumors/dataset_extraido/Training"
-test="/home/jesusr/Proyectos_Deep_Learning/Curso_Prof_de_Red_Neuro_con_TensorFlow/data/brain_tumors/dataset_extraido/Testing"
+train_dir = os.path.join(extract_dir, 'Training')
+test_dir = os.path.join(extract_dir, 'Testing')
 
 
 # Definimos los parámetros comunes

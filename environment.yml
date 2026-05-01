@@ -11,4 +11,7 @@ dependencies:
   - tensorflow
   - keras
   - ipykernel
+  - seaborn
+  - opencv
+  - imagehash
 prefix: /home/jesusr/anaconda3/envs/Curso_Prof_de_Red_Neuro_con_TensorFlow
