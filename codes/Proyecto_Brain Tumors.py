@@ -1,7 +1,5 @@
 # %% [markdown]
-## Importación de Bibliotecas
-from turtle import color
-
+### Importación de Bibliotecas
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -13,19 +11,22 @@ from PIL import Image
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from io import BytesIO
 import hashlib
+import imagehash
+from PIL import Image
+import cv2
 
 
 # %% [markdown]
-## Carga del Dataset
+### Carga del Dataset
 
-# Esto te dirá exactamente dónde está parado Python en este seg
-# %% [markdown]
-## Carga del Dataset
 
-base_path = "/home/jesusromero/Proyectos_Deep_Learning/Curso_Prof_de_Red_Neuro_con_TensorFlow"
+base_path = "/home/jesusr/Proyectos_Deep_Learning/Curso_Prof_de_Red_Neuro_con_TensorFlow"
 data_dir = os.path.join(base_path, "data", "brain_tumors")
 local = os.path.join(data_dir, "databasesLoadData.zip")
 extract_dir = os.path.join(data_dir, "dataset_extraido")
+
+train_dir = os.path.join(extract_dir, 'Training')
+test_dir = os.path.join(extract_dir, 'Testing')
 
 # CRÍTICO: Primero creamos la carpeta, de lo contrario wget no tendrá dónde guardar
 #os.makedirs(data_dir, exist_ok=True)
@@ -54,11 +55,62 @@ extract_dir = os.path.join(data_dir, "dataset_extraido")
 #    print(f"ERROR: No se pudo crear el directorio {data_dir}.")
         
 # %% [markdown]
-## EDA del dataset
-# Balanceo de Clases
+### EDA del dataset
 
-train_dir = os.path.join(extract_dir, 'Training')
-test_dir = os.path.join(extract_dir, 'Testing')
+
+## Detección de archivos Corruptos
+
+from PIL import Image
+
+def check_images(directory):
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith(('.jpg', '.jpeg', '.png')):
+                path = os.path.join(root, file)
+                try:
+                    img = Image.open(path)
+                    img.verify() # Verifica que el archivo no esté corrupto
+                except (IOError, SyntaxError):
+                    print(f'Archivo corrupto eliminado: {path}')
+                    os.remove(path)
+
+check_images(extract_dir)
+
+## Detección de Archivos Duplicados (Hashing)
+
+
+
+def eliminar_duplicados_visuales(directorio):
+    hashes_vistos = {}
+    duplicados_eliminados = 0
+    
+    for root, dirs, files in os.walk(directorio):
+        for file in files:
+            if file.lower().endswith(('.png', '.jpg', '.jpeg')):
+                path = os.path.join(root, file)
+                try:
+                    with Image.open(path) as img:
+                        # Genera un hash basado en la estructura visual, no en los bits
+                        # dhash es rápido y muy efectivo para detectar copias
+                        v_hash = imagehash.dhash(img)
+                    
+                    if v_hash in hashes_vistos:
+                        print(f"Eliminando duplicado visual: {path}")
+                        os.remove(path)
+                        duplicados_eliminados += 1
+                    else:
+                        hashes_vistos[v_hash] = path
+                except Exception as e:
+                    print(f"No se pudo procesar {file}: {e}")
+                
+    print(f"¡Limpieza visual terminada! Se eliminaron {duplicados_eliminados} archivos.")
+
+# Ejecutar en ambos
+eliminar_duplicados_visuales(train_dir)
+eliminar_duplicados_visuales(test_dir)
+
+## Balanceo de Clases
+
 
 sets = ['Training', 'Testing']
 MIS_CLASES = ['glioma', 'meningioma', 'notumor', 'pituitary']
@@ -90,62 +142,11 @@ plt.xticks(rotation=45)
 plt.grid(axis='y', linestyle='--', alpha=0.7)
 plt.show()
 
-# Detección de archivos Corruptos
 
-from PIL import Image
-
-def check_images(directory):
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            if file.endswith(('.jpg', '.jpeg', '.png')):
-                path = os.path.join(root, file)
-                try:
-                    img = Image.open(path)
-                    img.verify() # Verifica que el archivo no esté corrupto
-                except (IOError, SyntaxError):
-                    print(f'Archivo corrupto eliminado: {path}')
-                    os.remove(path)
-
-check_images(extract_dir)
-
-# Detección de Archivos Duplicados (Hashing)
-
-import imagehash
-from PIL import Image
-
-def eliminar_duplicados_visuales(directorio):
-    hashes_vistos = {}
-    duplicados_eliminados = 0
-    
-    for root, dirs, files in os.walk(directorio):
-        for file in files:
-            if file.lower().endswith(('.png', '.jpg', '.jpeg')):
-                path = os.path.join(root, file)
-                try:
-                    with Image.open(path) as img:
-                        # Genera un hash basado en la estructura visual, no en los bits
-                        # dhash es rápido y muy efectivo para detectar copias
-                        v_hash = imagehash.dhash(img)
-                    
-                    if v_hash in hashes_vistos:
-                        print(f"Eliminando duplicado visual: {path}")
-                        os.remove(path)
-                        duplicados_eliminados += 1
-                    else:
-                        hashes_vistos[v_hash] = path
-                except Exception as e:
-                    print(f"No se pudo procesar {file}: {e}")
-                
-    print(f"¡Limpieza visual terminada! Se eliminaron {duplicados_eliminados} archivos.")
-
-# Ejecutar en ambos
-eliminar_duplicados_visuales(train_dir)
-eliminar_duplicados_visuales(test_dir)
-
-# Análisis Dimensional (Tamaños y Proporciones)
+## Análisis Dimensional (Tamaños y Proporciones)
 
 
-# Definimos los directorios a analizar
+## Definimos los directorios a analizar
 sets_to_analyze = ['Training', 'Testing']
 colors = {'Training': 'blue', 'Testing': 'orange'}
 
@@ -190,7 +191,7 @@ print(f"Total de imágenes para prueba (Test): {total_test}")
 print(f"Proporción de entrenamiento: {total_train / (total_train + total_test):.2f}")
 print(f"Proporción de prueba: {total_test / (total_train + total_test):.2f}")
 
-# Análisis de Intensidad de Píxeles
+## Análisis de Intensidad de Píxeles
 
 import os
 import cv2
