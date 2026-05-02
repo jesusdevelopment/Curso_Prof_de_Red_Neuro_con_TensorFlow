@@ -1,6 +1,5 @@
 # %% [markdown]
 ## Importación de Bibliotecas
-from turtle import color
 
 import numpy as np
 import pandas as pd
@@ -13,22 +12,23 @@ from PIL import Image
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from io import BytesIO
 import hashlib
+import imagehash
+import os
+import cv2
+import numpy as np
+import random
+from imagehash import dhash
 
 
 # %% [markdown]
 ### Carga del Dataset
 
-# Esto te dirá exactamente dónde está parado Python en este seg
-# %% [markdown]
-## Carga del Dataset
+## Esto te dirá exactamente dónde está parado Python en este seg
 
-base_path = "/home/jesusr/Proyectos_Deep_Learning/Curso_Prof_de_Red_Neuro_con_TensorFlow"
+base_path = "/home/jesusromero/Proyectos_Deep_Learning/Curso_Prof_de_Red_Neuro_con_TensorFlow"
 data_dir = os.path.join(base_path, "data", "brain_tumors")
 local = os.path.join(data_dir, "databasesLoadData.zip")
 extract_dir = os.path.join(data_dir, "dataset_extraido")
-
-train_dir = os.path.join(extract_dir, 'Training')
-test_dir = os.path.join(extract_dir, 'Testing')
 
 # CRÍTICO: Primero creamos la carpeta, de lo contrario wget no tendrá dónde guardar
 #os.makedirs(data_dir, exist_ok=True)
@@ -57,8 +57,8 @@ test_dir = os.path.join(extract_dir, 'Testing')
 #    print(f"ERROR: No se pudo crear el directorio {data_dir}.")
         
 # %% [markdown]
-## EDA del dataset
-# Balanceo de Clases
+### EDA del dataset
+## Balanceo de Categorias
 
 train_dir = os.path.join(extract_dir, 'Training')
 test_dir = os.path.join(extract_dir, 'Testing')
@@ -93,9 +93,7 @@ plt.xticks(rotation=45)
 plt.grid(axis='y', linestyle='--', alpha=0.7)
 plt.show()
 
-# Detección de archivos Corruptos
-
-from PIL import Image
+## Detección de archivos Corruptos
 
 def check_images(directory):
     for root, dirs, files in os.walk(directory):
@@ -111,10 +109,7 @@ def check_images(directory):
 
 check_images(extract_dir)
 
-# Detección de Archivos Duplicados (Hashing)
-
-import imagehash
-from PIL import Image
+## Detección de Archivos Duplicados (Hashing)
 
 def eliminar_duplicados_visuales(directorio):
     hashes_vistos = {}
@@ -145,10 +140,10 @@ def eliminar_duplicados_visuales(directorio):
 eliminar_duplicados_visuales(train_dir)
 eliminar_duplicados_visuales(test_dir)
 
-# Análisis Dimensional (Tamaños y Proporciones)
+## Análisis Dimensional (Tamaños y Proporciones)
 
 
-## Definimos los directorios a analizar
+# Definimos los directorios a analizar
 sets_to_analyze = ['Training', 'Testing']
 colors = {'Training': 'blue', 'Testing': 'orange'}
 
@@ -193,13 +188,7 @@ print(f"Total de imágenes para prueba (Test): {total_test}")
 print(f"Proporción de entrenamiento: {total_train / (total_train + total_test):.2f}")
 print(f"Proporción de prueba: {total_test / (total_train + total_test):.2f}")
 
-# Análisis de Intensidad de Píxeles
-
-import os
-import cv2
-import numpy as np
-import matplotlib.pyplot as plt
-import random
+## Análisis de Intensidad de Píxeles
 
 def analizar_intensidades(extract_dir, sets=['Training', 'Testing'], sample_size=300):
     plt.figure(figsize=(12, 6))
