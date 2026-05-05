@@ -1,6 +1,5 @@
 # %% [markdown]
 ## Importación de Bibliotecas
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -11,24 +10,23 @@ import zipfile
 from PIL import Image
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from io import BytesIO
-import hashlib
-import imagehash
-import os
-import cv2
-import numpy as np
-import random
-from imagehash import dhash
+
 
 
 # %% [markdown]
 ### Carga del Dataset
 
-## Esto te dirá exactamente dónde está parado Python en este seg
+# Esto te dirá exactamente dónde está parado Python en este seg
+# %% [markdown]
+## Carga del Dataset
 
-base_path = "/home/jesusromero/Proyectos_Deep_Learning/Curso_Prof_de_Red_Neuro_con_TensorFlow"
+base_path = "/home/jesusr/Proyectos_Deep_Learning/Curso_Prof_de_Red_Neuro_con_TensorFlow"
 data_dir = os.path.join(base_path, "data", "brain_tumors")
 local = os.path.join(data_dir, "databasesLoadData.zip")
 extract_dir = os.path.join(data_dir, "dataset_extraido")
+
+train_dir = os.path.join(extract_dir, 'Training')
+test_dir = os.path.join(extract_dir, 'Testing')
 
 # CRÍTICO: Primero creamos la carpeta, de lo contrario wget no tendrá dónde guardar
 #os.makedirs(data_dir, exist_ok=True)
@@ -57,8 +55,8 @@ extract_dir = os.path.join(data_dir, "dataset_extraido")
 #    print(f"ERROR: No se pudo crear el directorio {data_dir}.")
         
 # %% [markdown]
-### EDA del dataset
-## Balanceo de Categorias
+## EDA del dataset
+# Balanceo de Clases
 
 train_dir = os.path.join(extract_dir, 'Training')
 test_dir = os.path.join(extract_dir, 'Testing')
@@ -93,7 +91,9 @@ plt.xticks(rotation=45)
 plt.grid(axis='y', linestyle='--', alpha=0.7)
 plt.show()
 
-## Detección de archivos Corruptos
+# Detección de archivos Corruptos
+
+from PIL import Image
 
 def check_images(directory):
     for root, dirs, files in os.walk(directory):
@@ -109,7 +109,10 @@ def check_images(directory):
 
 check_images(extract_dir)
 
-## Detección de Archivos Duplicados (Hashing)
+# Detección de Archivos Duplicados (Hashing)
+
+import imagehash
+from PIL import Image
 
 def eliminar_duplicados_visuales(directorio):
     hashes_vistos = {}
@@ -140,10 +143,10 @@ def eliminar_duplicados_visuales(directorio):
 eliminar_duplicados_visuales(train_dir)
 eliminar_duplicados_visuales(test_dir)
 
-## Análisis Dimensional (Tamaños y Proporciones)
+# Análisis Dimensional (Tamaños y Proporciones)
 
 
-# Definimos los directorios a analizar
+## Definimos los directorios a analizar
 sets_to_analyze = ['Training', 'Testing']
 colors = {'Training': 'blue', 'Testing': 'orange'}
 
@@ -188,7 +191,13 @@ print(f"Total de imágenes para prueba (Test): {total_test}")
 print(f"Proporción de entrenamiento: {total_train / (total_train + total_test):.2f}")
 print(f"Proporción de prueba: {total_test / (total_train + total_test):.2f}")
 
-## Análisis de Intensidad de Píxeles
+# Análisis de Intensidad de Píxeles
+
+import os
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+import random
 
 def analizar_intensidades(extract_dir, sets=['Training', 'Testing'], sample_size=300):
     plt.figure(figsize=(12, 6))
@@ -196,7 +205,7 @@ def analizar_intensidades(extract_dir, sets=['Training', 'Testing'], sample_size
     
     print("Iniciando análisis de intensidades de píxel...")
 
-    for dataset_type in sets:
+    for dataset_type in    sets:
         dataset_path = os.path.join(extract_dir, dataset_type)
         all_files = []
         
@@ -364,14 +373,16 @@ history = model.fit(
     epochs=epochs,
     callbacks=[early_stopping]
 )
-
+# %%
 # Evaluar en el set de test
 loss, accuracy = model.evaluate(test_ds)
 print(f"Precisión en Test: {accuracy*100:.2f}%")
 
 # Reporte de clasificación (opcional pero muy recomendado)
+class_names=['glioma', 'meningioma', 'notumor', 'pituitary']
 from sklearn.metrics import classification_report
 y_true = np.concatenate([y for x, y in test_ds], axis=0)
 y_pred = np.argmax(model.predict(test_ds), axis=-1)
+
 
 print(classification_report(y_true, y_pred, target_names=train_ds.class_names))

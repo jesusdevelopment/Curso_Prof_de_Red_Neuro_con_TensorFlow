@@ -1,7 +1,6 @@
 # %% [markdown]
 ## Importación de Bibliotecas
-from turtle import color
-
+#!pip install imagehash
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -9,7 +8,7 @@ import seaborn as sns
 import os
 import tensorflow as tf
 import zipfile
-from PIL import Image
+from PIL import Image    
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from io import BytesIO
 import hashlib
@@ -63,35 +62,45 @@ test_dir = os.path.join(extract_dir, 'Testing')
 train_dir = os.path.join(extract_dir, 'Training')
 test_dir = os.path.join(extract_dir, 'Testing')
 
+# %% [markdown]
+## EDA: Balanceo de Clases (Corregido para Tumores Cerebrales)
+
+# 1. Definimos las carpetas y clases EXACTAS del dataset de tumores
 sets = ['Training', 'Testing']
-MIS_CLASES = ['glioma', 'meningioma', 'notumor', 'pituitary']
+MIS_CLASES_BRAIN = ['glioma', 'meningioma', 'notumor', 'pituitary']
 stats = []
 
 for dataset_type in sets:
-    for label in MIS_CLASES:
-        # Construimos la ruta dinámicamente para Training y Testing
-        path = os.path.join(extract_dir, dataset_type, label)
+    # Construimos la ruta: /home/jesusr/.../dataset_extraido/Training (o Testing)
+    set_path = os.path.join(extract_dir, dataset_type)
+    
+    if not os.path.exists(set_path):
+        print(f"⚠️ Alerta: No se encontró la carpeta: {set_path}")
+        continue
+
+    for label in MIS_CLASES_BRAIN:
+        path = os.path.join(set_path, label)
         if os.path.exists(path):
             count = len(os.listdir(path))
             stats.append({
                 'label': label, 
                 'count': count, 
-                'dataset': dataset_type  # Nueva columna para diferenciar
+                'dataset': dataset_type
             })
+        else:
+            print(f"❌ Carpeta de clase no encontrada: {path}")
 
-# Crear el DataFrame
+# 2. Crear el DataFrame y Graficar
 df_stats = pd.DataFrame(stats)
 
-# Graficar usando 'hue' para separar por Training/Testing
-plt.figure(figsize=(12, 6))
-sns.barplot(x='label', y='count', hue='dataset', data=df_stats)
-
-plt.title('Comparación de Distribución de Clases: Entrenamiento vs. Test')
-plt.xlabel('Tipo de Tumor')
-plt.ylabel('Cantidad de Imágenes')
-plt.xticks(rotation=45)
-plt.grid(axis='y', linestyle='--', alpha=0.7)
-plt.show()
+if df_stats.empty:
+    print("FATAL: El DataFrame está vacío. Revisa las rutas de 'extract_dir'.")
+else:
+    plt.figure(figsize=(12, 6))
+    sns.barplot(x='label', y='count', hue='dataset', data=df_stats)
+    plt.title('Distribución de Clases: Glioma, Meningioma, No Tumor y Pituitaria')
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.show()
 
 # Detección de archivos Corruptos
 
@@ -375,14 +384,57 @@ history = model.fit(
     epochs=epochs,
     callbacks=[early_stopping]
 )
-
+# %%
 # Evaluar en el set de test
 loss, accuracy = model.evaluate(test_ds)
 print(f"Precisión en Test: {accuracy*100:.2f}%")
 
 # Reporte de clasificación (opcional pero muy recomendado)
 from sklearn.metrics import classification_report
+
 y_true = np.concatenate([y for x, y in test_ds], axis=0)
 y_pred = np.argmax(model.predict(test_ds), axis=-1)
 
-print(classification_report(y_true, y_pred, target_names=train_ds.class_names))
+# 1. Creas el dataset
+# 1. Definimos las clases primero (esto es lo que usará el classification_report al final)
+MIS_CLASES_REALES = ['glioma', 'meningioma', 'notumor', 'pituitary']
+
+# 2. Carga de Entrenamiento y Validación (Usando la variable train_dir que ya tienes)
+train_ds = tf.keras.utils.image_dataset_from_directory(
+    train_dir,
+    validation_split=0.2,
+    class_names=MIS_CLASES_REALES,
+    subset="training",
+    seed=42,
+    image_size=IMG_SIZE, 
+    batch_size=BATCH_SIZE
+)
+
+val_ds = tf.keras.utils.image_dataset_from_directory(
+    train_dir,
+    validation_split=0.2,
+    class_names=MIS_CLASES_REALES,
+    subset="validation",
+    seed=42,
+    image_size=IMG_SIZE,
+    batch_size=BATCH_SIZE
+)
+
+# 3. Carga de Test (Usando test_dir)
+test_ds = tf.keras.utils.image_dataset_from_directory(
+    test_dir,
+    class_names=MIS_CLASES_REALES,
+    shuffle=False,
+    image_size=IMG_SIZE,
+    batch_size=BATCH_SIZE
+)
+
+# 4. Optimizamos (Aquí es donde el objeto cambia de tipo, pero ya guardamos las clases arriba)
+AUTOTUNE = tf.data.AUTOTUNE
+train_ds = train_ds.prefetch(buffer_size=AUTOTUNE)
+val_ds = val_ds.prefetch(buffer_size=AUTOTUNE)
+test_ds = test_ds.prefetch(buffer_size=AUTOTUNE)))
+# %%
+
+# Usa la variable que definimos al principio del proceso de carga
+print(classification_report(y_true, y_pred, target_names=MIS_CLASES_REALES))

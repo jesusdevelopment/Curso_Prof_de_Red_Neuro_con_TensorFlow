@@ -13,6 +13,9 @@ from io import BytesIO
 import matplotlib.pyplot as plt
 import seaborn as sns
 import base64
+import tensorflow as tf
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
 # %% [markdown]
 ## 1. Definimos la Ruta Base del Proyecto
 
