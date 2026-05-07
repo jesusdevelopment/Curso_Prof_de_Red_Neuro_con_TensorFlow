@@ -1,6 +1,6 @@
 # %% [markdown]
 ## Importación de Bibliotecas
-#!pip install imagehash
+!pip install imagehash
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -8,57 +8,58 @@ import seaborn as sns
 import os
 import tensorflow as tf
 import zipfile
-from PIL import Image    
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from PIL import Image
+import glob   
 from io import BytesIO
 import hashlib
 
-
 # %% [markdown]
-### Carga del Dataset
+## 1. Conexión con Google Drive y Carga de Datos Limpios
 
-# Esto te dirá exactamente dónde está parado Python en este seg
-# %% [markdown]
-## Carga del Dataset
+if not os.path.exists('/content/drive'):
+    drive.mount('/content/drive')
 
-base_path = "/home/jesusr/Proyectos_Deep_Learning/Curso_Prof_de_Red_Neuro_con_TensorFlow"
-data_dir = os.path.join(base_path, "data", "brain_tumors")
-local = os.path.join(data_dir, "databasesLoadData.zip")
-extract_dir = os.path.join(data_dir, "dataset_extraido")
+# 2. Configuración de rutas
+ruta_rar = "/content/drive/MyDrive/Data/Curso Prof TensorFlow/dataset_extraido.rar"
+extract_dir = "/content/dataset_trabajo"
 
-train_dir = os.path.join(extract_dir, 'Training')
-test_dir = os.path.join(extract_dir, 'Testing')
-
-# CRÍTICO: Primero creamos la carpeta, de lo contrario wget no tendrá dónde guardar
-#os.makedirs(data_dir, exist_ok=True)
-
-#if os.path.isdir(data_dir):
-#    print(f"Directorio confirmado en: {data_dir}")
-
-    # Corregido: La URL debe ir entre comillas
-#    url = "https://www.kaggle.com/api/v1/datasets/download/masoudnickparvar/brain-tumor-mri-dataset"
+# 3. Proceso de extracción con limpieza previa
+if os.path.exists(ruta_rar):
+    # Borramos si existía algo corrupto para empezar de cero
+    if os.path.exists(extract_dir):
+        !rm -rf "{extract_dir}"
     
-    # Descarga
-#    print("Iniciando descarga...")
-#    !wget --no-check-certificate "{url}" -O "{local}"
+    os.makedirs(extract_dir, exist_ok=True)
+    
+    print("📦 Extrayendo dataset... Por favor, espera a que aparezca el mensaje de éxito.")
+    # -o+ (sobreescribir), -idq (modo silencioso para no llenar la consola)
+    !unrar x -o+ -idq "{ruta_rar}" "{extract_dir}/"
+    
+    # --- VERIFICACIÓN DINÁMICA ---
+    # Buscamos la carpeta 'Training' en cualquier nivel de profundidad
+    print("🔍 Buscando carpetas de datos...")
+    hallazgos = glob.glob(os.path.join(extract_dir, "**/Training"), recursive=True)
+    
+    if hallazgos:
+        # Definimos las rutas reales basadas en el hallazgo
+        base_real = os.path.dirname(hallazgos[0])
+        train_dir = os.path.join(base_real, 'Training')
+        test_dir = os.path.join(base_real, 'Testing')
         
-    ## 5. Extracción 
-#    if os.path.exists(local):
-#        print(f"¡Éxito! Archivo descargado en: {local}")
+        print(f"✅ ¡Éxito! Carpetas encontradas en: {base_real}")
+        print(f"📍 Train: {train_dir}")
+        print(f"📍 Test:  {test_dir}")
         
-        # Lógica de extracción que faltaba
-#        with zipfile.ZipFile(local, 'r') as zip_ref:
-#            zip_ref.extractall(extract_dir)
-#        print(f"Dataset extraído en: {extract_dir}")
-#    else:
-#        print("ERROR: wget no pudo guardar el archivo. Verifica tu conexión o el enlace.")
-#else:
-#    print(f"ERROR: No se pudo crear el directorio {data_dir}.")
-        
-# %% [markdown]
-## EDA del dataset
-# Balanceo de Clases
+        # Sobreescribimos la variable para que el resto de tu código funcione
+        extract_dir = base_real 
+    else:
+        print("❌ ERROR: El .rar se extrajo pero no contiene una carpeta llamada 'Training'.")
+        print("Contenido extraído:")
+        !ls -R "{extract_dir}" | head -n 10
+else:
+    print(f"❌ ERROR: No se encontró el archivo en Drive: {ruta_rar}")
 
+# 4. Definir rutas para el resto del código
 train_dir = os.path.join(extract_dir, 'Training')
 test_dir = os.path.join(extract_dir, 'Testing')
 
@@ -433,7 +434,7 @@ test_ds = tf.keras.utils.image_dataset_from_directory(
 AUTOTUNE = tf.data.AUTOTUNE
 train_ds = train_ds.prefetch(buffer_size=AUTOTUNE)
 val_ds = val_ds.prefetch(buffer_size=AUTOTUNE)
-test_ds = test_ds.prefetch(buffer_size=AUTOTUNE)))
+test_ds = test_ds.prefetch(buffer_size=AUTOTUNE)
 # %%
 
 # Usa la variable que definimos al principio del proceso de carga

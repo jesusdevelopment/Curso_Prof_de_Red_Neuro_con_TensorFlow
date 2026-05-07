@@ -6,14 +6,14 @@ import requests
 import numpy as np
 import pandas as pd
 from PIL import Image
-from io import BytesIO 
-%matplotlib inline
+from io import BytesIO  
 import matplotlib.pyplot as plt
 import seaborn as sns
 import base64
 import tensorflow as tf
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import string
+import zipfile
 
 # %% [markdown]
 ## 1. Definimos la Ruta Base del Proyecto
@@ -58,7 +58,7 @@ train_ds=tf.keras.utils.image_dataset_from_directory(
     labels='inferred',
     label_mode='categorical',
     color_mode='grayscale',
-    image_size=(64,64),
+    image_size=(28,28),
     interpolation='nearest',
     batch_size=128,    
     shuffle=True,
@@ -72,7 +72,7 @@ test_ds=tf.keras.utils.image_dataset_from_directory(
     labels='inferred',
     label_mode='categorical',
     color_mode='grayscale',
-    image_size=(64,64),
+    image_size=(28,28),
     interpolation='nearest',
     batch_size=128,
     shuffle=False,
@@ -84,7 +84,7 @@ validation_ds=tf.keras.utils.image_dataset_from_directory(
     labels='inferred',
     label_mode='categorical',
     color_mode='grayscale',
-    image_size=(64,64),
+    image_size=(28,28),
     interpolation='nearest',
     batch_size=128,
     shuffle=True,
@@ -109,3 +109,71 @@ for images, labels in train_ds.take(1):
 plt.show()
 # %% [markdown]
 ## Creación del Modelo
+# %% [markdown]
+## Optimización del Rendimiento de los Datasets
+
+# Mantenemos esto porque es una buena práctica para acelerar la lectura de datos
+AUTOTUNE = tf.data.AUTOTUNE
+train_ds = train_ds.cache().prefetch(buffer_size=AUTOTUNE)
+validation_ds = validation_ds.cache().prefetch(buffer_size=AUTOTUNE)
+test_ds = test_ds.cache().prefetch(buffer_size=AUTOTUNE)
+
+# %% [markdown]
+## Creación del Modelo Secuencial Base (Perceptrón Multicapa - Solo Redes Densas)
+
+model = tf.keras.models.Sequential([
+    # 1. Preprocesamiento: Normalizamos los píxeles de [0, 255] a [0, 1]
+    tf.keras.layers.Rescaling(1./255, input_shape=(28, 28, 1)),
+    
+    # 2. APLANADO (FLATTEN) - ¡El paso más importante aquí!
+    # Toma la matriz de 28x28 y la estira en un solo vector de 784 números.
+    # Las capas Densas solo entienden información en 1 dimensión.
+    tf.keras.layers.Flatten(),
+    
+    # 3. Capas Ocultas (Red Neuronal Profunda Tradicional)
+    # Empezamos con muchas neuronas y vamos reduciendo como un embudo
+    tf.keras.layers.Dense(512, activation='relu'),
+    tf.keras.layers.Dense(256, activation='relu'),
+    
+    # Apagamos el 30% de las neuronas al azar en cada época para evitar que 
+    # el modelo memorice (overfitting)
+    tf.keras.layers.Dropout(0.3), 
+    
+    tf.keras.layers.Dense(128, activation='relu'),
+    
+    # 4. Capa de Salida
+    # 24 neuronas (una para cada letra de tu dataset).
+    # Softmax convierte los resultados en porcentajes de probabilidad que suman 1 (100%)
+    tf.keras.layers.Dense(24, activation='softmax')
+])
+
+# Veamos cuántos parámetros (pesos) va a tener que aprender este modelo
+model.summary()
+
+# %% [markdown]
+## Compilación del Modelo
+
+model.compile(
+    optimizer='adam',
+    # categorical_crossentropy porque usaste label_mode='categorical' en tus generadores
+    loss='categorical_crossentropy', 
+    metrics=['accuracy']
+)
+
+# %% [markdown]
+## Entrenamiento del Modelo
+
+epochs = 15
+
+print("Iniciando el entrenamiento de la Red Densa...")
+history = model.fit(
+    train_ds,
+    validation_data=validation_ds,
+    epochs=epochs
+)
+
+# %% [markdown]
+## Evaluación Final en el Set de Prueba
+
+loss, accuracy = model.evaluate(test_ds)
+print(f"\nPrecisión final en datos no vistos (Test): {accuracy * 100:.2f}%")
