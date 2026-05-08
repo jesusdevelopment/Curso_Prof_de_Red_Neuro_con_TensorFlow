@@ -92,7 +92,7 @@ validation_ds=tf.keras.utils.image_dataset_from_directory(
     subset='validation',
     seed=42
 )
-# %% 
+  # %% 
 classes=[char for char in string.ascii_uppercase if char !="J" if char !="Z"]
 print(classes)
 print(len(classes))
@@ -113,10 +113,10 @@ plt.show()
 ## Optimización del Rendimiento de los Datasets
 
 # Mantenemos esto porque es una buena práctica para acelerar la lectura de datos
-AUTOTUNE = tf.data.AUTOTUNE
-train_ds = train_ds.cache().prefetch(buffer_size=AUTOTUNE)
-validation_ds = validation_ds.cache().prefetch(buffer_size=AUTOTUNE)
-test_ds = test_ds.cache().prefetch(buffer_size=AUTOTUNE)
+#AUTOTUNE = tf.data.AUTOTUNE
+#train_ds = train_ds.cache().prefetch(buffer_size=AUTOTUNE)
+#validation_ds = validation_ds.cache().prefetch(buffer_size=AUTOTUNE)
+#test_ds = test_ds.cache().prefetch(buffer_size=AUTOTUNE)
 
 # %% [markdown]
 ## Creación del Modelo Secuencial Base (Perceptrón Multicapa - Solo Redes Densas)
@@ -132,12 +132,12 @@ model = tf.keras.models.Sequential([
     
     # 3. Capas Ocultas (Red Neuronal Profunda Tradicional)
     # Empezamos con muchas neuronas y vamos reduciendo como un embudo
-    tf.keras.layers.Dense(512, activation='relu'),
+    #tf.keras.layers.Dense(512, activation='relu'),
     tf.keras.layers.Dense(256, activation='relu'),
     
     # Apagamos el 30% de las neuronas al azar en cada época para evitar que 
     # el modelo memorice (overfitting)
-    tf.keras.layers.Dropout(0.3), 
+    #tf.keras.layers.Dropout(0.3), 
     
     tf.keras.layers.Dense(128, activation='relu'),
     
@@ -163,7 +163,7 @@ model.compile(
 # %% [markdown]
 ## Entrenamiento del Modelo
 
-epochs = 15
+epochs = 20
 
 print("Iniciando el entrenamiento de la Red Densa...")
 history = model.fit(
@@ -177,3 +177,52 @@ history = model.fit(
 
 loss, accuracy = model.evaluate(test_ds)
 print(f"\nPrecisión final en datos no vistos (Test): {accuracy * 100:.2f}%")
+# %%[markdown]
+## Reporte de Clasificación
+
+def visualizacion_resultados(history, model_name, classes):
+    # Gráfica de precisión y pérdida
+    plt.figure(figsize=(12, 5))
+
+    # Precisión
+    plt.subplot(1, 2, 1)
+    plt.plot(history.history['accuracy'], label='Precisión de Entrenamiento')
+    plt.plot(history.history['val_accuracy'], label='Precisión de Validación')
+    plt.title(f'Precisión del Modelo {model_name}')
+    plt.xlabel('Época')
+    plt.ylabel('Precisión')
+    plt.legend()
+
+    # Pérdida
+    plt.subplot(1, 2, 2)
+    plt.plot(history.history['loss'], label='Pérdida de Entrenamiento')
+    plt.plot(history.history['val_loss'], label='Pérdida de Validación')
+    plt.title(f'Pérdida del Modelo {model_name}')
+    plt.xlabel('Época')
+    plt.ylabel('Pérdida')
+    plt.legend()
+    plt.show()
+    
+visualizacion_resultados(history, "Red Densa", classes)
+
+# %% [markdown]
+## Callbacks
+from tensorflow.keras.callbacks import Callback
+
+class CustomCallback(Callback):
+    def on_epoch_end(self, epoch, logs={}):
+            if logs.get('val_accuracy') > 0.95:
+                print("\n¡Precisión de validación alcanzada > 95%! Cancelando entrenamiento.")
+                self.model.stop_training = True
+# %% [markdown]
+callback=CustomCallback()
+
+history_callback=model.fit(
+    train_ds,
+    validation_data=validation_ds,
+    epochs=epochs,
+    callbacks=[callback]
+)
+
+# %%
+visualizacion_resultados(history_callback, "Red Densa con Callback", classes)
