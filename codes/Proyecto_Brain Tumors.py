@@ -12,6 +12,7 @@ from PIL import Image
 import glob   
 from io import BytesIO
 import hashlib
+from google.colab import drive
 
 # %% [markdown]
 ## 1. Conexión con Google Drive y Carga de Datos Limpios
@@ -439,3 +440,33 @@ test_ds = test_ds.prefetch(buffer_size=AUTOTUNE)
 
 # Usa la variable que definimos al principio del proceso de carga
 print(classification_report(y_true, y_pred, target_names=MIS_CLASES_REALES))
+
+# %% [markdown]
+## Graficación de accuracy y loss
+
+def plot_loss_accuracy(history):
+    acc = history.history['accuracy']
+    val_acc = history.history['val_accuracy']
+    loss = history.history['loss']
+    val_loss = history.history['val_loss']
+
+    epochs_range = range(len(acc))
+
+    plt.figure(figsize=(12, 4))
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs_range, acc, label='Training Accuracy')
+    plt.plot(epochs_range, val_acc, label='Validation Accuracy')
+    plt.legend(loc='lower right')
+    plt.title('Training and Validation Accuracy')
+
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs_range, loss, label='Training Loss')
+    plt.plot(epochs_range, val_loss, label='Validation Loss')
+    plt.legend(loc='upper right')
+    plt.title('Training and Validation Loss')
+    plt.show()
+    
+# %%
+plot_loss_accuracy(history)
+#
+# %%
