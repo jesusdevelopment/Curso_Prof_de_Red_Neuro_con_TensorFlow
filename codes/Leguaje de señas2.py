@@ -215,9 +215,20 @@ class CustomCallback(Callback):
                 print("\n¡Precisión de validación alcanzada > 95%! Cancelando entrenamiento.")
                 self.model.stop_training = True
 # %% [markdown]
+## Instanciamiento y Entrenamiento
+#1. Volvemos a definir el modelo para que sus pesos empiecen de cero
+model2 = tf.keras.models.Sequential([
+    tf.keras.layers.Rescaling(1./255, input_shape=(28, 28, 1)),
+    tf.keras.layers.Flatten(),
+    tf.keras.layers.Dense(256, activation='relu'),
+    tf.keras.layers.Dense(128, activation='relu'),
+    tf.keras.layers.Dense(24, activation='softmax')
+])
+
+model2.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 callback=CustomCallback()
 
-history_callback=model.fit(
+history_callback=model2.fit(
     train_ds,
     validation_data=validation_ds,
     epochs=epochs,
@@ -226,3 +237,5 @@ history_callback=model.fit(
 
 # %%
 visualizacion_resultados(history_callback, "Red Densa con Callback", classes)
+
+# %%
