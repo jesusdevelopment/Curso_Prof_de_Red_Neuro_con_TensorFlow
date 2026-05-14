@@ -1,4 +1,5 @@
 # %%
+!pip install -q -U keras-tuner
 import os
 import json
  #from regex import F
@@ -14,6 +15,10 @@ import tensorflow as tf
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import string
 import zipfile
+import kerastuner as kt
+from tensorflow import keras
+from tensorflow.keras import regularizers
+
 
 # %% [markdown]
 ## 1. Definimos la Ruta Base del Proyecto
@@ -234,8 +239,55 @@ history_callback=model2.fit(
     epochs=epochs,
     callbacks=[callback]
 )
-
-# %%
 visualizacion_resultados(history_callback, "Red Densa con Callback", classes)
+# %% [markdown]
+## Keras Tunning
 
-# %%
+def constructor_modelos(hp):
+  model = tf.keras.models.Sequential()
+  model.add(tf.keras.layers.Conv2D(75, (3,3), activation = "relu", input_shape = (28,28,1)))
+  model.add(tf.keras.layers.MaxPooling2D((2,2)))
+  model.add(tf.keras.layers.Flatten())
+
+  hp_units = hp.Int("units", min_value = 32, max_value = 512, step = 32)
+  model.add(tf.keras.layers.Dense(units = hp_units, activation = "relu", kernel_regularizer = regularizers.l2(1e-5)))
+  model.add(tf.keras.layers.Dropout(0.2))
+  model.add(tf.keras.layers.Dense(128, activation = "relu", kernel_regularizer = regularizers.l2(1e-5)))
+  model.add(tf.keras.layers.Dropout(0.2))
+  model.add(tf.keras.layers.Dense(len(classes), activation = "softmax"))
+
+  hp_learning_rate = hp.Choice("learning_rate", values = [1e-2, 1e-3, 1e-4])
+
+  model.compile(optimizer = keras.optimizers.Adam(learning_rate=hp_learning_rate), loss = "categorical_crossentropy", metrics = ["accuracy"])
+
+  return model
+
+# %% [markdown]
+## Tunning
+
+tuner = kt.Hyperband(
+    constructor_modelos,
+    objective = "val_accuracy",
+    max_epochs = 20,
+    factor = 3,
+    directory = "models/",
+    project_name = "platzi-tunner"
+)
+
+tuner.search(train_ds, epochs=20, validation_data= validation_ds)
+best_hps= tuner.get_best_hyperparameters(num_trials=1)[0]
+
+# %% 
+print(best_hps.get("units"))
+print(best_hps.get("learning_rate"))
+
+hypermodel = tuner.hypermodel.build(best_hps)
+callback_early = tf.keras.callbacks.EarlyStopping(monitor = "loss", patience = 3, mode = "auto")
+history_hypermodel = hypermodel.fit(
+    train_ds,
+    epochs = 20,
+    callbacks = [callback_early],
+    validation_data = validation_ds
+)
+
+  # %%
