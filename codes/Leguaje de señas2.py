@@ -244,23 +244,34 @@ visualizacion_resultados(history_callback, "Red Densa con Callback", classes)
 ## Keras Tunning
 
 def constructor_modelos(hp):
-  model = tf.keras.models.Sequential()
-  model.add(tf.keras.layers.Conv2D(75, (3,3), activation = "relu", input_shape = (28,28,1)))
-  model.add(tf.keras.layers.MaxPooling2D((2,2)))
-  model.add(tf.keras.layers.Flatten())
+    model = tf.keras.models.Sequential()
+    
+    # Capas fijas (Extracción de características)
+    model.add(tf.keras.layers.Rescaling(1./255, input_shape=(28, 28, 1)))
+    model.add(tf.keras.layers.Conv2D(75, (3,3), activation="relu"))
+    model.add(tf.keras.layers.MaxPooling2D((2,2)))
+    model.add(tf.keras.layers.Flatten())
 
-  hp_units = hp.Int("units", min_value = 32, max_value = 512, step = 32)
-  model.add(tf.keras.layers.Dense(units = hp_units, activation = "relu", kernel_regularizer = regularizers.l2(1e-5)))
-  model.add(tf.keras.layers.Dropout(0.2))
-  model.add(tf.keras.layers.Dense(128, activation = "relu", kernel_regularizer = regularizers.l2(1e-5)))
-  model.add(tf.keras.layers.Dropout(0.2))
-  model.add(tf.keras.layers.Dense(len(classes), activation = "softmax"))
+    # --- ESPACIO DE BÚSQUEDA ---
+    # 1. Ajuste dinámico de neuronas
+    hp_units = hp.Int("units", min_value=32, max_value=512, step=32)
+    model.add(tf.keras.layers.Dense(units=hp_units, activation="relu", 
+                           kernel_regularizer=regularizers.l2(1e-5)))
+    
+    # 2. Ajuste dinámico de Dropout
+    hp_dropout = hp.Float("dropout", min_value=0.1, max_value=0.5, step=0.1)
+    model.add(tf.keras.layers.Dropout(rate=hp_dropout))
+    
+    # 23. Capas estables
+    model.add(tf.keras.layers.Dense(128, activation="relu"))
+    model.add(tf.keras.layers.Dense(len(classes), activation="softmax"))
 
-  hp_learning_rate = hp.Choice("learning_rate", values = [1e-2, 1e-3, 1e-4])
+    # 3. Elección de Learning Rate
+    hp_learning_rate = hp.Choice("learning_rate", values=[1e-2, 1e-3, 1e-4])
 
-  model.compile(optimizer = keras.optimizers.Adam(learning_rate=hp_learning_rate), loss = "categorical_crossentropy", metrics = ["accuracy"])
+    model.compile(optimizer = keras.optimizers.Adam(learning_rate=hp_learning_rate), loss = "categorical_crossentropy", metrics = ["accuracy"])
 
-  return model
+    return model
 
 # %% [markdown]
 ## Tunning
@@ -290,4 +301,24 @@ history_hypermodel = hypermodel.fit(
     validation_data = validation_ds
 )
 
-  # %%
+
+  # %% [markdown]
+## Sumary
+hypermodel.summary()
+
+# %% [markdown]
+## Mejor modelo
+
+hypermodel= tuner.hypermodel.build(best_hps)
+
+history_hypermodel= hypermodel.fit(train_ds, 
+                                   epochs=20,
+                                   callbacks=[callback_early],
+                                   validation_data= validation_ds)
+
+# %%
+loss, accuracy = hypermodel.evaluate(test_ds)
+# %%
+print(f"Loss: {loss}, Accuracy: {accuracy}")
+
+# %%
