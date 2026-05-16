@@ -185,7 +185,7 @@ print(f"\nPrecisión final en datos no vistos (Test): {accuracy * 100:.2f}%")
 # %%[markdown]
 ## Reporte de Clasificación
 
-def visualizacion_resultados(history, model_name, classes):
+def visualizacion_resultados(history, model_name):
     # Gráfica de precisión y pérdida
     plt.figure(figsize=(12, 5))
 
@@ -208,7 +208,7 @@ def visualizacion_resultados(history, model_name, classes):
     plt.legend()
     plt.show()
     
-visualizacion_resultados(history, "Red Densa", classes)
+visualizacion_resultados(history, "Red Densa")
 
 # %% [markdown]
 ## Callbacks
@@ -239,7 +239,7 @@ history_callback=model2.fit(
     epochs=epochs,
     callbacks=[callback]
 )
-visualizacion_resultados(history_callback, "Red Densa con Callback", classes)
+visualizacion_resultados(history_callback, "Red Densa con Callback")
 # %% [markdown]
 ## Keras Tunning
 
@@ -288,9 +288,15 @@ tuner = kt.Hyperband(
 tuner.search(train_ds, epochs=20, validation_data= validation_ds)
 best_hps= tuner.get_best_hyperparameters(num_trials=1)[0]
 
-# %% 
+# %% [markdown]
+## Análisis de Resultados
+tuner.results_summary()
+
 print(best_hps.get("units"))
 print(best_hps.get("learning_rate"))
+
+# %% [markdown]
+## Mejor modelo
 
 hypermodel = tuner.hypermodel.build(best_hps)
 callback_early = tf.keras.callbacks.EarlyStopping(monitor = "loss", patience = 3, mode = "auto")
@@ -305,20 +311,40 @@ history_hypermodel = hypermodel.fit(
   # %% [markdown]
 ## Sumary
 hypermodel.summary()
-
-# %% [markdown]
-## Mejor modelo
-
-hypermodel= tuner.hypermodel.build(best_hps)
-
-history_hypermodel= hypermodel.fit(train_ds, 
-                                   epochs=20,
-                                   callbacks=[callback_early],
-                                   validation_data= validation_ds)
-
 # %%
 loss, accuracy = hypermodel.evaluate(test_ds)
 # %%
 print(f"Loss: {loss}, Accuracy: {accuracy}")
 
+# %% [markdown]
+## Guardando Arquitectura
+
+model_json = hypermodel.to_json()
+with open("model.json", "w") as json_file:
+    json_file.write(model_json)
+
+# %%
+print(model_json)
+
+# %% [markdown]
+## Guardando Pesos
+hypermodel.save_weights("model.h5")
+
+# %% [markdown]
+## Carga del Modelo
+
+# %%
+with open("model.json", "r") as json_file:
+    loaded_model_json = json_file.read()
+loaded_model = tf.keras.models.model_from_json(loaded_model_json)
+
+# %%
+loaded_model.load_weights("model.h5")
+
+# %%
+loaded_model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+# %%
+loss, accuracy = loaded_model.evaluate(test_ds)
+print(f"Loss del modelo cargado: {loss}, Accuracy del modelo cargado: {accuracy}")
 # %%
