@@ -18,6 +18,8 @@ import zipfile
 import kerastuner as kt
 from tensorflow import keras
 from tensorflow.keras import regularizers
+from tensorflow.keras.callbacks import Callback
+from tensorflow.keras.callbacks import ModelCheckpoint
 
 
 # %% [markdown]
@@ -212,8 +214,6 @@ visualizacion_resultados(history, "Red Densa")
 
 # %% [markdown]
 ## Callbacks
-from tensorflow.keras.callbacks import Callback
-
 class CustomCallback(Callback):
     def on_epoch_end(self, epoch, logs={}):
             if logs.get('val_accuracy') > 0.95:
@@ -318,33 +318,57 @@ print(f"Loss: {loss}, Accuracy: {accuracy}")
 
 # %% [markdown]
 ## Guardando Arquitectura
+def get_model():
+  model = tf.keras.models.Sequential([
+    tf.keras.layers.Conv2D(75, (3,3), activation = "relu", input_shape = (28, 28, 1)),
+    tf.keras.layers.MaxPool2D((2,2)),
+    tf.keras.layers.Flatten(),
+    tf.keras.layers.Dense(256, kernel_regularizer = regularizers.l2(1e-5), activation = "relu"),
+    tf.keras.layers.Dropout(0.2),
+    tf.keras.layers.Dense(128, kernel_regularizer = regularizers.l2(1e-5), activation = "relu"),
+    tf.keras.layers.Dropout(0.2),
+    tf.keras.layers.Dense(len(classes), activation = "softmax")
+])
+  return model
 
-model_json = hypermodel.to_json()
-with open("model.json", "w") as json_file:
-    json_file.write(model_json)
+# 1. Creamos y compilamos el modelo base
+model_weight = get_model()
+model_weight.compile(optimizer="adam", 
+                     loss="categorical_crossentropy", 
+                     metrics=["accuracy"])
 
-# %%
-print(model_json)
+# 2. Configuración del Callback
+# Usamos {epoch:02d} para que cree archivos numerados y conserve el historial real
 
+
+checkpoint_path = "/content/drive/MyDrive/model_checkpoints/mejor_modelo.weights.h5"
+
+checkpoint_weight = ModelCheckpoint(
+    filepath=checkpoint_path,
+    monitor="val_loss",        # La métrica que va a vigilar (puedes usar también 'val_accuracy')
+    save_best_only=True,       # ¡La magia ocurre aquí!
+    mode="min",                # 'min' porque queremos que el 'val_loss' sea lo más BAJO posible
+    save_weights_only=False,    # Mantiene tu archivo ligero (solo pesos)
+    verbose=1
+)
+
+# 3. Entrenamos pasando el callback en la lista
+history_weight = model_weight.fit(
+    train_ds, 
+    epochs=20, 
+    callbacks=[checkpoint_weight], 
+    validation_data=validation_ds
+)
 # %% [markdown]
-## Guardando Pesos
-hypermodel.save_weights("model.h5")
+## Carga del modelo
 
-# %% [markdown]
-## Carga del Modelo
 
-# %%
-with open("model.json", "r") as json_file:
-    loaded_model_json = json_file.read()
-loaded_model = tf.keras.models.model_from_json(loaded_model_json)
+# Carga directa de arquitectura y pesos simultáneamente (si save_weights_only=False)
+model_completo_cargado = tf.keras.models.load_model("/content/drive/MyDrive/model_checkpoints/mejor_modelo.weights.h5")
+# Al ejecutar la evaluación, Keras se ve obligado a "construir" las métricas
+# y verás que funciona perfectamente.
+loss, accuracy = model_completo_cargado.evaluate(test_ds)
 
-# %%
-loaded_model.load_weights("model.h5")
-
-# %%
-loaded_model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-
-# %%
-loss, accuracy = loaded_model.evaluate(test_ds)
-print(f"Loss del modelo cargado: {loss}, Accuracy del modelo cargado: {accuracy}")
+print(f"Pérdida tras la carga: {loss}")
+print(f"Precisión tras la carga: {accuracy}") 
 # %%
