@@ -20,7 +20,7 @@ from tensorflow import keras
 from tensorflow.keras import regularizers
 from tensorflow.keras.callbacks import Callback
 from tensorflow.keras.callbacks import ModelCheckpoint
-import tensorflow_hub as hub
+
 
 
 # %% [markdown]

@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
+import tensorboard
 import tensorflow as tf
 import zipfile
 from PIL import Image
@@ -13,6 +14,12 @@ import glob
 from io import BytesIO
 import hashlib
 from google.colab import drive
+from tensorflow.keras.callbacks import Callback
+from tensorflow.keras.callbacks import ModelCheckpoint
+import datetime
+import cv2
+import random
+import subprocess
 
 # %% [markdown]
 ## 1. Conexión con Google Drive y Carga de Datos Limpios
@@ -65,9 +72,9 @@ train_dir = os.path.join(extract_dir, 'Training')
 test_dir = os.path.join(extract_dir, 'Testing')
 
 # %% [markdown]
-## EDA: Balanceo de Clases (Corregido para Tumores Cerebrales)
+## 5. EDA: Balanceo de Clases (Corregido para Tumores Cerebrales)
 
-# 1. Definimos las carpetas y clases EXACTAS del dataset de tumores
+# 6. Definimos las carpetas y clases EXACTAS del dataset de tumores
 sets = ['Training', 'Testing']
 MIS_CLASES_BRAIN = ['glioma', 'meningioma', 'notumor', 'pituitary']
 stats = []
@@ -92,7 +99,7 @@ for dataset_type in sets:
         else:
             print(f"❌ Carpeta de clase no encontrada: {path}")
 
-# 2. Crear el DataFrame y Graficar
+# 7. Crear el DataFrame y Graficar
 df_stats = pd.DataFrame(stats)
 
 if df_stats.empty:
@@ -104,7 +111,7 @@ else:
     plt.grid(axis='y', linestyle='--', alpha=0.7)
     plt.show()
 
-# Detección de archivos Corruptos
+#8. Detección de archivos Corruptos
 
 from PIL import Image
 
@@ -122,7 +129,7 @@ def check_images(directory):
 
 check_images(extract_dir)
 
-# Detección de Archivos Duplicados (Hashing)
+#9.  Detección de Archivos Duplicados (Hashing)
 
 import imagehash
 from PIL import Image
@@ -156,7 +163,7 @@ def eliminar_duplicados_visuales(directorio):
 eliminar_duplicados_visuales(train_dir)
 eliminar_duplicados_visuales(test_dir)
 
-# Análisis Dimensional (Tamaños y Proporciones)
+# 10. Análisis Dimensional (Tamaños y Proporciones)
 
 
 ## Definimos los directorios a analizar
@@ -206,11 +213,7 @@ print(f"Proporción de prueba: {total_test / (total_train + total_test):.2f}")
 
 # Análisis de Intensidad de Píxeles
 
-import os
-import cv2
-import numpy as np
-import matplotlib.pyplot as plt
-import random
+
 
 def analizar_intensidades(extract_dir, sets=['Training', 'Testing'], sample_size=300):
     plt.figure(figsize=(12, 6))
@@ -308,7 +311,7 @@ test_ds = tf.keras.utils.image_dataset_from_directory(
     # Nota: No usamos 'subset' ni 'validation_split' aquí
 )
 # %% [markdown]
-## Visualización de 5 imágenes
+## Visualización de 5 muestras
 
 plt.figure(figsize=(10, 10))
 for images, labels in train_ds.take(1): # Tomamos un batch del dataset de entrenamiento
@@ -329,8 +332,7 @@ data_augmentation = tf.keras.Sequential([
     tf.keras.layers.RandomContrast(0.2)
 ])
 
-# Normalización de las imágenes
-preprocess_input = tf.keras.layers.Rescaling(1./255)
+
 
 # %% [markdown]
 # Configuración del rendimiento
@@ -380,11 +382,22 @@ early_stopping = tf.keras.callbacks.EarlyStopping(
     restore_best_weights=True
 )
 
+log_dir = os.path.join("logs", "fit", datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+
+tensorboard_callback = tf.keras.callbacks.TensorBoard(
+    log_dir=log_dir,
+    histogram_freq=1,     # Monitorea la salud de los pesos en cada época
+    write_graph=True,     # Permite revisar la pestaña "Graphs"
+    write_images=True,    # Visualiza los filtros de las capas convolucionales
+    update_freq='epoch',
+    profile_batch=0       # Mantener apagado a menos que sientas lento el entrenamiento
+)
+
 history = model.fit(
     train_ds,
     validation_data=val_ds,
     epochs=epochs,
-    callbacks=[early_stopping]
+    callbacks=[early_stopping, tensorboard_callback]
 )
 # %%
 # Evaluar en el set de test
@@ -397,52 +410,9 @@ from sklearn.metrics import classification_report
 y_true = np.concatenate([y for x, y in test_ds], axis=0)
 y_pred = np.argmax(model.predict(test_ds), axis=-1)
 
-# 1. Creas el dataset
-# 1. Definimos las clases primero (esto es lo que usará el classification_report al final)
-MIS_CLASES_REALES = ['glioma', 'meningioma', 'notumor', 'pituitary']
+print("\n--- REPORTE DE CLASIFICACIÓN ---")
+print(classification_report(y_true, y_pred, target_names=MIS_CLASES_BRAIN))
 
-# 2. Carga de Entrenamiento y Validación (Usando la variable train_dir que ya tienes)
-train_ds = tf.keras.utils.image_dataset_from_directory(
-    train_dir,
-    validation_split=0.2,
-    class_names=MIS_CLASES_REALES,
-    subset="training",
-    seed=42,
-    image_size=IMG_SIZE, 
-    batch_size=BATCH_SIZE
-)
-
-val_ds = tf.keras.utils.image_dataset_from_directory(
-    train_dir,
-    validation_split=0.2,
-    class_names=MIS_CLASES_REALES,
-    subset="validation",
-    seed=42,
-    image_size=IMG_SIZE,
-    batch_size=BATCH_SIZE
-)
-
-# 3. Carga de Test (Usando test_dir)
-test_ds = tf.keras.utils.image_dataset_from_directory(
-    test_dir,
-    class_names=MIS_CLASES_REALES,
-    shuffle=False,
-    image_size=IMG_SIZE,
-    batch_size=BATCH_SIZE
-)
-
-# 4. Optimizamos (Aquí es donde el objeto cambia de tipo, pero ya guardamos las clases arriba)
-AUTOTUNE = tf.data.AUTOTUNE
-train_ds = train_ds.prefetch(buffer_size=AUTOTUNE)
-val_ds = val_ds.prefetch(buffer_size=AUTOTUNE)
-test_ds = test_ds.prefetch(buffer_size=AUTOTUNE)
-# %%
-
-# Usa la variable que definimos al principio del proceso de carga
-print(classification_report(y_true, y_pred, target_names=MIS_CLASES_REALES))
-
-# %% [markdown]
-## Graficación de accuracy y loss
 
 def plot_loss_accuracy(history):
     acc = history.history['accuracy']
@@ -468,5 +438,37 @@ def plot_loss_accuracy(history):
     
 # %%
 plot_loss_accuracy(history)
-#
+
+# %% [markdown]
+## 6.1 Visualización de TensorBoard
+
+# %%
+!ls -l logs/fit
+# %%
+#!tensorboard --logdir logs/fit --port 6006 --bind_all & 
+# %%
+# 1. Instalamos localtunnel en el servidor remoto de Colab
+!npm install -g localtunnel
+
+# 2. Arrancamos TensorBoard en segundo plano de forma silenciosa
+
+subprocess.Popen(["tensorboard", "--logdir", "logs/fit", "--port", "6006"])
+
+# 3. Extraemos la IP pública del servidor (la vas a necesitar en el siguiente paso)
+print("\n============== INSTRUCCIONES ==============")
+print("1. Copia esta dirección IP completa:")
+!curl https://localtunnel.me/tunnelme
+
+
+# 4. Creamos el túnel de acceso web seguro
+print("\n2. Haz clic en el enlace de abajo para abrir TensorBoard:")
+!lt --port 6006
+# %%
+# Para acceder a la interfaz de TensorBoard, ejecuta la siguiente celda y haz clic en el enlace que aparecerá.
+# Si estás en Google Colab, el enlace será algo como: https://<tu-id-de-colab>.ngrok.io
+# %%
+
+
+# %%
+!tensorboard dev upload --logdir ./logs --name "Proyecto prueba" --description "Test development results" --one_shot
 # %%
