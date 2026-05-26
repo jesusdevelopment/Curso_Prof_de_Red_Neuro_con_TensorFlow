@@ -324,7 +324,7 @@ plt.show()
 
 
 # %% [markdown]
-### Preprocesamiento de Datos con capas dentro del modelo (Data Augmentatio)
+### Preprocesamiento de Datos con capas dentro del modelo (Data Augmentation)
 data_augmentation = tf.keras.Sequential([
     tf.keras.layers.RandomFlip("horizontal_and_vertical"),
     tf.keras.layers.RandomRotation(0.2),
@@ -353,7 +353,7 @@ base_model = tf.keras.applications.MobileNetV2(input_shape=IMG_SIZE + (3,),
 # Congelar el modelo base (importante para no destruir los pesos pre-entrenados)
 base_model.trainable = False
 
-#  Crea la arquitectura completa usando la API Funcional o Sequential
+#  Crea la arquitectura completa usando la API Funcional en modo Sequential
 inputs = tf.keras.Input(shape=(224, 224, 3))
 x = data_augmentation(inputs)  # Aplicamos tus capas de aumento
 x = tf.keras.applications.mobilenet_v2.preprocess_input(x) # Normalización [-1, 1]
